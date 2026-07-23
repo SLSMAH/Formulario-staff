@@ -2,9 +2,6 @@ const DB_NAME = "cruza2_staff_db";
 const DB_VERSION = 1;
 const STORE_NAME = "applications";
 
-let applications = [];
-let activeApplicationId = null;
-
 const choiceCatalog = {
   q1: {
     correct: "b",
@@ -98,6 +95,8 @@ const choiceCatalog = {
   }
 };
 
+let applications = [];
+let activeApplicationId = null;
 
 const listElement = document.getElementById("applicationsList");
 const totalCount = document.getElementById("totalCount");
@@ -107,6 +106,7 @@ const searchInput = document.getElementById("searchInput");
 const statusFilter = document.getElementById("statusFilter");
 const exportBtn = document.getElementById("exportBtn");
 const clearBtn = document.getElementById("clearBtn");
+const logoutBtn = document.getElementById("logoutBtn");
 const detailDialog = document.getElementById("detailDialog");
 const dialogTitle = document.getElementById("dialogTitle");
 const dialogMeta = document.getElementById("dialogMeta");
@@ -115,7 +115,6 @@ const closeDialogBtn = document.getElementById("closeDialogBtn");
 const acceptBtn = document.getElementById("acceptBtn");
 const rejectBtn = document.getElementById("rejectBtn");
 const deleteBtn = document.getElementById("deleteBtn");
-const logoutBtn = document.getElementById("logoutBtn");
 
 function escapeHtml(value) {
   return String(value ?? "")
@@ -132,6 +131,7 @@ function openDatabase() {
 
     request.onupgradeneeded = () => {
       const db = request.result;
+
       if (!db.objectStoreNames.contains(STORE_NAME)) {
         const store = db.createObjectStore(STORE_NAME, {
           keyPath: "id",
@@ -154,12 +154,10 @@ async function getApplications() {
 
   return new Promise((resolve, reject) => {
     const transaction = db.transaction(STORE_NAME, "readonly");
-    const store = transaction.objectStore(STORE_NAME);
-    const request = store.getAll();
+    const request = transaction.objectStore(STORE_NAME).getAll();
 
     request.onsuccess = () => {
-      const rows = request.result.sort((a, b) => b.id - a.id);
-      resolve(rows);
+      resolve(request.result.sort((a, b) => b.id - a.id));
     };
 
     request.onerror = () => reject(request.error);
@@ -173,10 +171,11 @@ async function updateApplication(id, patch) {
   return new Promise((resolve, reject) => {
     const transaction = db.transaction(STORE_NAME, "readwrite");
     const store = transaction.objectStore(STORE_NAME);
-    const getRequest = store.get(id);
+    const request = store.get(id);
 
-    getRequest.onsuccess = () => {
-      const application = getRequest.result;
+    request.onsuccess = () => {
+      const application = request.result;
+
       if (!application) {
         reject(new Error("Solicitud no encontrada."));
         return;
@@ -228,7 +227,10 @@ async function clearApplications() {
 
 function formatDate(dateValue) {
   const date = new Date(dateValue);
-  if (Number.isNaN(date.getTime())) return "Fecha desconocida";
+
+  if (Number.isNaN(date.getTime())) {
+    return "Fecha desconocida";
+  }
 
   return new Intl.DateTimeFormat("es-DO", {
     dateStyle: "medium",
@@ -236,12 +238,71 @@ function formatDate(dateValue) {
   }).format(date);
 }
 
+function getAnswerDetails(answer) {
+  if (answer.type !== "choice") {
+    return {
+      text: answer.answerText || answer.answer || "Sin respuesta",
+      option: "",
+      correctness: "manual"
+    };
+  }
+
+  const selectedOption = String(answer.answer || "").toLowerCase();
+  const catalogEntry = choiceCatalog[answer.id];
+  const text = answer.answerText
+    || catalogEntry?.options?.[selectedOption]
+    || `Opción ${selectedOption.toUpperCase() || "desconocida"}`;
+
+  const isCorrect = Boolean(
+    catalogEntry && selectedOption === catalogEntry.correct
+  );
+
+  return {
+    text,
+    option: selectedOption.toUpperCase(),
+    correctness: isCorrect ? "correct" : "incorrect"
+  };
+}
+
+function getScoreData(application) {
+  const choiceAnswers = Array.isArray(application.answers)
+    ? application.answers.filter((answer) => answer.type === "choice")
+    : [];
+
+  const maxScore = Object.keys(choiceCatalog).length;
+  const score = choiceAnswers.reduce((total, answer) => {
+    const catalogEntry = choiceCatalog[answer.id];
+    const selectedOption = String(answer.answer || "").toLowerCase();
+
+    return total + (
+      catalogEntry && selectedOption === catalogEntry.correct
+        ? 1
+        : 0
+    );
+  }, 0);
+
+  return {
+    score,
+    maxScore,
+    percentage: maxScore
+      ? Math.round((score / maxScore) * 100)
+      : 0
+  };
+}
+
 function updateStats(rows) {
   totalCount.textContent = rows.length;
-  pendingCount.textContent = rows.filter((row) => row.status === "Pendiente").length;
+  pendingCount.textContent = rows.filter(
+    (row) => row.status === "Pendiente"
+  ).length;
 
   const average = rows.length
-    ? Math.round(rows.reduce((sum, row) => sum + Number(row.percentage || 0), 0) / rows.length)
+    ? Math.round(
+        rows.reduce(
+          (sum, row) => sum + getScoreData(row).percentage,
+          0
+        ) / rows.length
+      )
     : 0;
 
   averageScore.textContent = `${average}%`;
@@ -252,10 +313,11 @@ function filteredApplications() {
   const status = statusFilter.value;
 
   return applications.filter((application) => {
-    const matchesSearch = !search ||
-      String(application.discord || "").toLowerCase().includes(search);
+    const matchesSearch = !search
+      || String(application.discord || "").toLowerCase().includes(search);
 
-    const matchesStatus = status === "all" || application.status === status;
+    const matchesStatus = status === "all"
+      || application.status === status;
 
     return matchesSearch && matchesStatus;
   });
@@ -274,29 +336,40 @@ function renderApplications() {
     return;
   }
 
-  listElement.innerHTML = rows.map((application) => `
-    <article class="application-card">
-      <div class="application-main">
-        <strong>${escapeHtml(application.discord)}</strong>
-        <span>Solicitud #${application.id} · ${escapeHtml(formatDate(application.createdAt))}</span>
-      </div>
+  listElement.innerHTML = rows.map((application) => {
+    const scoreData = getScoreData(application);
 
-      <div class="application-data">
-        <strong>${Number(application.score || 0)}/${Number(application.maxScore || 0)}</strong>
-        <span>Resultado automático: ${Number(application.percentage || 0)}%</span>
-      </div>
+    return `
+      <article class="application-card">
+        <div class="application-main">
+          <strong>${escapeHtml(application.discord)}</strong>
+          <span>
+            Solicitud #${application.id} ·
+            ${escapeHtml(formatDate(application.createdAt))}
+          </span>
+        </div>
 
-      <div>
-        <span class="status ${escapeHtml(application.status)}">
-          ${escapeHtml(application.status)}
-        </span>
-      </div>
+        <div class="application-data">
+          <strong>${scoreData.score}/${scoreData.maxScore}</strong>
+          <span>Resultado automático: ${scoreData.percentage}%</span>
+        </div>
 
-      <button class="button ghost open-detail" type="button" data-id="${application.id}">
-        Ver respuestas
-      </button>
-    </article>
-  `).join("");
+        <div>
+          <span class="status ${escapeHtml(application.status)}">
+            ${escapeHtml(application.status)}
+          </span>
+        </div>
+
+        <button
+          class="button ghost open-detail"
+          type="button"
+          data-id="${application.id}"
+        >
+          Ver respuestas
+        </button>
+      </article>
+    `;
+  }).join("");
 
   listElement.querySelectorAll(".open-detail").forEach((button) => {
     button.addEventListener("click", () => {
@@ -305,44 +378,29 @@ function renderApplications() {
   });
 }
 
-function getAnswerDetails(answer) {
-  if (answer.type !== "choice") {
-    return {
-      text: answer.answerText || answer.answer || "Sin respuesta",
-      option: "",
-      correctness: "manual"
-    };
-  }
-
-  const selectedOption = String(answer.answer || "").toLowerCase();
-  const catalogEntry = choiceCatalog[answer.id];
-  const text = answer.answerText
-    || catalogEntry?.options?.[selectedOption]
-    || `Opción ${selectedOption.toUpperCase() || "desconocida"}`;
-
-  const isCorrect = typeof answer.isCorrect === "boolean"
-    ? answer.isCorrect
-    : Boolean(catalogEntry && selectedOption === catalogEntry.correct);
-
-  return {
-    text,
-    option: selectedOption.toUpperCase(),
-    correctness: isCorrect ? "correct" : "incorrect"
-  };
-}
-
 function openApplication(id) {
   const application = applications.find((item) => item.id === id);
-  if (!application) return;
 
+  if (!application) {
+    return;
+  }
+
+  const scoreData = getScoreData(application);
   activeApplicationId = id;
   dialogTitle.textContent = application.discord;
 
   dialogMeta.innerHTML = `
     <span class="meta-chip">Solicitud #${application.id}</span>
-    <span class="meta-chip">${escapeHtml(formatDate(application.createdAt))}</span>
-    <span class="meta-chip">Resultado: ${Number(application.score || 0)}/${Number(application.maxScore || 0)}</span>
-    <span class="meta-chip">Estado: ${escapeHtml(application.status)}</span>
+    <span class="meta-chip">
+      ${escapeHtml(formatDate(application.createdAt))}
+    </span>
+    <span class="meta-chip">
+      Resultado: ${scoreData.score}/${scoreData.maxScore}
+      (${scoreData.percentage}%)
+    </span>
+    <span class="meta-chip">
+      Estado: ${escapeHtml(application.status)}
+    </span>
   `;
 
   dialogAnswers.innerHTML = application.answers.map((answer, index) => {
@@ -359,7 +417,13 @@ function openApplication(id) {
           <h3>${index + 1}. ${escapeHtml(answer.question)}</h3>
           ${badge}
         </div>
-        ${details.option ? `<span class="selected-option">Opción ${escapeHtml(details.option)}</span>` : ""}
+
+        ${details.option
+          ? `<span class="selected-option">
+              Opción ${escapeHtml(details.option)}
+            </span>`
+          : ""}
+
         <p>${escapeHtml(details.text)}</p>
       </article>
     `;
@@ -369,18 +433,13 @@ function openApplication(id) {
 }
 
 async function changeStatus(status) {
-  if (!activeApplicationId) return;
+  if (!activeApplicationId) {
+    return;
+  }
 
   await updateApplication(activeApplicationId, { status });
   detailDialog.close();
-  await 
-logoutBtn.addEventListener("click", () => {
-  sessionStorage.removeItem("cruza2_admin_auth");
-  sessionStorage.removeItem("cruza2_admin_auth_time");
-  window.location.replace("login.html");
-});
-
-loadApplications();
+  await loadApplications();
 }
 
 async function loadApplications() {
@@ -401,62 +460,71 @@ searchInput.addEventListener("input", renderApplications);
 statusFilter.addEventListener("change", renderApplications);
 
 closeDialogBtn.addEventListener("click", () => detailDialog.close());
+
 detailDialog.addEventListener("click", (event) => {
   if (event.target === detailDialog) {
     detailDialog.close();
   }
 });
 
-acceptBtn.addEventListener("click", () => changeStatus("Aceptado"));
-rejectBtn.addEventListener("click", () => changeStatus("Rechazado"));
+acceptBtn.addEventListener("click", () => {
+  changeStatus("Aceptado");
+});
+
+rejectBtn.addEventListener("click", () => {
+  changeStatus("Rechazado");
+});
 
 deleteBtn.addEventListener("click", async () => {
-  if (!activeApplicationId) return;
+  if (!activeApplicationId) {
+    return;
+  }
 
-  const confirmed = confirm("¿Seguro que deseas eliminar esta solicitud?");
-  if (!confirmed) return;
+  const confirmed = confirm(
+    "¿Seguro que deseas eliminar esta solicitud?"
+  );
+
+  if (!confirmed) {
+    return;
+  }
 
   await deleteApplication(activeApplicationId);
   detailDialog.close();
-  await 
-logoutBtn.addEventListener("click", () => {
-  sessionStorage.removeItem("cruza2_admin_auth");
-  sessionStorage.removeItem("cruza2_admin_auth_time");
-  window.location.replace("login.html");
-});
-
-loadApplications();
+  await loadApplications();
 });
 
 clearBtn.addEventListener("click", async () => {
-  const confirmed = confirm("Esto eliminará todas las solicitudes guardadas en este navegador. ¿Continuar?");
-  if (!confirmed) return;
+  const confirmed = confirm(
+    "Esto eliminará todas las solicitudes guardadas en este navegador. ¿Continuar?"
+  );
+
+  if (!confirmed) {
+    return;
+  }
 
   await clearApplications();
-  await 
-logoutBtn.addEventListener("click", () => {
-  sessionStorage.removeItem("cruza2_admin_auth");
-  sessionStorage.removeItem("cruza2_admin_auth_time");
-  window.location.replace("login.html");
-});
-
-loadApplications();
+  await loadApplications();
 });
 
 exportBtn.addEventListener("click", () => {
+  const exportData = applications.map((application) => ({
+    ...application,
+    automaticResult: getScoreData(application)
+  }));
+
   const blob = new Blob(
-    [JSON.stringify(applications, null, 2)],
+    [JSON.stringify(exportData, null, 2)],
     { type: "application/json" }
   );
 
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
   link.href = url;
-  link.download = `cruza2-solicitudes-${new Date().toISOString().slice(0, 10)}.json`;
+  link.download =
+    `cruza2-solicitudes-${new Date().toISOString().slice(0, 10)}.json`;
   link.click();
   URL.revokeObjectURL(url);
 });
-
 
 logoutBtn.addEventListener("click", () => {
   sessionStorage.removeItem("cruza2_admin_auth");
