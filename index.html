@@ -27,9 +27,27 @@
         <img src="assets/dragon_icon.png" alt="Icono de Cruza2 Roleplay" class="mascot">
       </div>
 
-      <div class="brand-footer">
-        <span class="status-dot"></span>
-        <span>Formulario web independiente</span>
+      <div class="brand-audio-area">
+        <div class="music-player" aria-label="Controles de música">
+          <button class="music-button" id="musicToggle" type="button" title="Pausar o reproducir música">
+            <span id="musicToggleIcon" aria-hidden="true">▶</span>
+          </button>
+
+          <button class="music-button" id="volumeDown" type="button" title="Bajar volumen">
+            <span aria-hidden="true">−</span>
+          </button>
+
+          <button class="music-button" id="volumeUp" type="button" title="Subir volumen">
+            <span aria-hidden="true">+</span>
+          </button>
+
+          <span class="music-status" id="musicStatus">Música 35%</span>
+        </div>
+
+        <div class="brand-footer">
+          <span class="status-dot"></span>
+          <span>Formulario web independiente</span>
+        </div>
       </div>
     </aside>
 
@@ -69,6 +87,7 @@
     </section>
   </main>
 
+  <audio id="backgroundMusic" src="assets/background_soft.webm" loop preload="auto"></audio>
   <script src="app.js"></script>
 </body>
 </html>
