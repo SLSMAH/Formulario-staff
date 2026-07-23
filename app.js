@@ -155,18 +155,6 @@ const questions = [
   }
 ];
 
-const answerKey = {
-  q1: "b",
-  q2: "c",
-  q3: "a",
-  q4: "d",
-  q5: "b",
-  q6: "c",
-  q7: "a",
-  q8: "d",
-  q9: "b",
-  q10: "c"
-};
 
 const DRAFT_KEY = "cruza2_staff_active_attempt_v3";
 
@@ -240,6 +228,12 @@ const sectionKicker = document.getElementById("sectionKicker");
 const sectionTitle = document.getElementById("sectionTitle");
 const validationText = document.getElementById("validationText");
 const actions = document.querySelector(".actions");
+const backgroundMusic = document.getElementById("backgroundMusic");
+const musicToggle = document.getElementById("musicToggle");
+const musicToggleIcon = document.getElementById("musicToggleIcon");
+const volumeDown = document.getElementById("volumeDown");
+const volumeUp = document.getElementById("volumeUp");
+const musicStatus = document.getElementById("musicStatus");
 
 function escapeHtml(value) {
   return String(value ?? "")
@@ -285,23 +279,6 @@ async function saveApplication(application) {
     request.onerror = () => reject(request.error);
     transaction.oncomplete = () => db.close();
   });
-}
-
-function calculateScore() {
-  let score = 0;
-  const maxScore = Object.keys(answerKey).length;
-
-  for (const [questionId, correctAnswer] of Object.entries(answerKey)) {
-    if (state.answers[questionId] === correctAnswer) {
-      score++;
-    }
-  }
-
-  return {
-    score,
-    maxScore,
-    percentage: Math.round((score / maxScore) * 100)
-  };
 }
 
 function currentProgress() {
@@ -363,28 +340,15 @@ function updateHeader() {
       : "DESARROLLO";
     sectionTitle.textContent = "Evaluación de conocimientos";
     backBtn.disabled = false;
+    nextBtnText.textContent = state.step === questions.length - 1
+      ? "Revisar"
+      : "Siguiente";
 
     if (question.type === "choice") {
-      const selectedAnswer = state.answers[question.id];
-      const isLocked = state.lockedChoices?.[question.id] === true;
-
-      nextBtnText.textContent = isLocked
-        ? (state.step === questions.length - 1 ? "Revisar" : "Siguiente")
-        : "Siguiente";
-
-      if (!selectedAnswer) {
-        validationText.textContent = "Selecciona una respuesta";
-      } else if (!isLocked) {
-        validationText.textContent = "Pulsa Siguiente para comprobar";
-      } else {
-        validationText.textContent = selectedAnswer === answerKey[question.id]
-          ? "Respuesta correcta"
-          : "Respuesta incorrecta";
-      }
+      validationText.textContent = state.answers[question.id]
+        ? "Respuesta registrada"
+        : "Selecciona una respuesta";
     } else {
-      nextBtnText.textContent = state.step === questions.length - 1
-        ? "Revisar"
-        : "Siguiente";
       validationText.textContent = isCurrentValid()
         ? "Respuesta guardada"
         : "Mínimo 20 caracteres";
@@ -414,8 +378,8 @@ function renderIntro() {
         Esta versión funciona completamente fuera de MTA. Guarda las solicitudes en la base de datos
         local del navegador mediante IndexedDB.
         <strong>Cada pregunta de selección múltiple permite un solo intento.</strong>
-        Primero selecciona una opción y luego pulsa <b>Siguiente</b>. En ese momento se comprobará,
-        se bloqueará y se mostrará el resultado.
+        La primera opción elegida queda bloqueada. El postulante no verá si estuvo bien o mal;
+        esa evaluación solamente aparecerá en el panel administrativo.
       </div>
 
       <div class="field-group">
@@ -449,10 +413,7 @@ function renderIntro() {
 
 function renderChoiceQuestion(question) {
   const selected = state.answers[question.id] || "";
-  const correctAnswer = answerKey[question.id];
   const isLocked = state.lockedChoices?.[question.id] === true;
-  const hasResult = isLocked && Boolean(selected);
-  const isCorrect = hasResult && selected === correctAnswer;
 
   content.innerHTML = `
     <div class="view">
@@ -465,13 +426,7 @@ function renderChoiceQuestion(question) {
           let optionClass = "";
 
           if (selected === value) {
-            if (isLocked) {
-              optionClass = value === correctAnswer
-                ? "selected correct"
-                : "selected incorrect";
-            } else {
-              optionClass = "selected pending";
-            }
+            optionClass = "selected confirmed";
           } else if (isLocked) {
             optionClass = "locked";
           }
@@ -490,25 +445,11 @@ function renderChoiceQuestion(question) {
         }).join("")}
       </div>
 
-      ${hasResult ? `
-        <div class="answer-feedback ${isCorrect ? "correct" : "incorrect"}">
-          <span class="feedback-icon">${isCorrect ? "✓" : "!"}</span>
-          <div>
-            <strong>${isCorrect ? "Respuesta correcta" : "Respuesta incorrecta"}</strong>
-            <p>
-              ${isCorrect
-                ? "La respuesta fue registrada correctamente. Ya puedes continuar."
-                : "La respuesta fue registrada como incorrecta. El intento quedó bloqueado y ya puedes continuar."}
-            </p>
-          </div>
-        </div>
-      ` : `
-        <div class="single-attempt-warning ${selected ? "ready" : ""}">
-          ${selected
-            ? "Opción seleccionada. Pulsa Siguiente para confirmar y conocer el resultado."
-            : "Selecciona una sola opción. El resultado aparecerá únicamente al pulsar Siguiente."}
-        </div>
-      `}
+      <div class="single-attempt-warning ${isLocked ? "registered" : ""}">
+        ${isLocked
+          ? "Respuesta registrada. No podrás modificarla y el resultado solo será visible para la administración."
+          : "Elige con cuidado: la primera opción que pulses quedará registrada definitivamente."}
+      </div>
     </div>
   `;
 
@@ -517,12 +458,11 @@ function renderChoiceQuestion(question) {
       option.addEventListener("click", () => {
         if (state.lockedChoices?.[question.id]) return;
 
-        // Solo una opción puede estar seleccionada a la vez, pero aún puede
-        // cambiarse antes de pulsar Siguiente.
         state.answers[question.id] = option.dataset.option;
+        state.lockedChoices[question.id] = true;
         saveDraft();
         render();
-      });
+      }, { once: true });
     });
   }
 }
@@ -653,20 +593,6 @@ function goNext() {
     return;
   }
 
-  if (state.step >= 0 && state.step < questions.length) {
-    const question = questions[state.step];
-
-    // Primera pulsación de Siguiente: confirma y bloquea la respuesta.
-    // No avanza todavía; primero muestra si fue correcta o incorrecta.
-    if (question.type === "choice" && !state.lockedChoices?.[question.id]) {
-      state.lockedChoices[question.id] = true;
-      saveDraft();
-      render();
-      return;
-    }
-  }
-
-  // Segunda pulsación de Siguiente, o una pregunta de desarrollo: avanzar.
   if (state.step < questions.length) {
     state.step++;
     saveDraft();
@@ -694,8 +620,6 @@ async function submitForm() {
   updateHeader();
 
   try {
-    const scoreData = calculateScore();
-
     const application = {
       discord: state.discord.trim(),
       answers: questions.map((question) => {
@@ -711,15 +635,9 @@ async function submitForm() {
           answer: selectedValue,
           answerText: question.type === "choice"
             ? selectedOption?.[1] || "Respuesta desconocida"
-            : selectedValue,
-          isCorrect: question.type === "choice"
-            ? selectedValue === answerKey[question.id]
-            : null
+            : selectedValue
         };
       }),
-      score: scoreData.score,
-      maxScore: scoreData.maxScore,
-      percentage: scoreData.percentage,
       status: "Pendiente",
       createdAt: new Date().toISOString()
     };
@@ -742,5 +660,70 @@ document.addEventListener("keydown", (event) => {
     goNext();
   }
 });
+
+
+function updateMusicControls() {
+  const volume = Math.round(backgroundMusic.volume * 100);
+  musicStatus.textContent = `Música ${volume}%`;
+  musicToggleIcon.textContent = backgroundMusic.paused ? "▶" : "Ⅱ";
+  musicToggle.title = backgroundMusic.paused
+    ? "Reproducir música"
+    : "Pausar música";
+}
+
+async function playMusic() {
+  try {
+    await backgroundMusic.play();
+  } catch (error) {
+    // Algunos navegadores bloquean el autoplay hasta la primera interacción.
+  }
+  updateMusicControls();
+}
+
+backgroundMusic.volume = 0.35;
+updateMusicControls();
+
+musicToggle.addEventListener("click", async () => {
+  if (backgroundMusic.paused) {
+    await playMusic();
+  } else {
+    backgroundMusic.pause();
+    updateMusicControls();
+  }
+});
+
+volumeDown.addEventListener("click", async () => {
+  backgroundMusic.volume = Math.max(0, backgroundMusic.volume - 0.1);
+
+  if (backgroundMusic.paused) {
+    await playMusic();
+  } else {
+    updateMusicControls();
+  }
+});
+
+volumeUp.addEventListener("click", async () => {
+  backgroundMusic.volume = Math.min(1, backgroundMusic.volume + 0.1);
+
+  if (backgroundMusic.paused) {
+    await playMusic();
+  } else {
+    updateMusicControls();
+  }
+});
+
+const startMusicAfterInteraction = async () => {
+  if (backgroundMusic.paused) {
+    await playMusic();
+  }
+
+  document.removeEventListener("pointerdown", startMusicAfterInteraction);
+  document.removeEventListener("keydown", startMusicAfterInteraction);
+};
+
+document.addEventListener("pointerdown", startMusicAfterInteraction, { once: true });
+document.addEventListener("keydown", startMusicAfterInteraction, { once: true });
+
+playMusic();
 
 render();
