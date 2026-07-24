@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#08090d">
+  <title>Cruza2 Roleplay | Formularios oficiales</title>
+  <link rel="icon" href="assets/dragon_icon.png">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="background-grid"></div>
+  <div class="ambient ambient-one"></div>
+  <div class="ambient ambient-two"></div>
+
+  <main class="site-shell">
+    <aside class="brand-panel">
+      <div class="brand-heading">
+        <span class="eyebrow">POSTULACIONES OFICIALES</span>
+        <video class="brand-video" src="assets/cruza2_logo_360.mp4" autoplay loop muted playsinline></video>
+        <p>Selecciona el área a la que deseas postularte y completa su evaluación correspondiente.</p>
+      </div>
+
+      <div class="brand-mascot">
+        <img src="assets/dragon_icon.png" alt="Cruza2 Roleplay">
+      </div>
+
+      <div class="brand-controls">
+        <div class="music-player">
+          <button id="musicToggle" class="music-button" type="button" title="Pausar o reproducir">▶</button>
+          <button id="volumeDown" class="music-button" type="button" title="Bajar volumen">−</button>
+          <button id="volumeUp" class="music-button" type="button" title="Subir volumen">+</button>
+          <span id="musicStatus">Música 35%</span>
+        </div>
+        <a class="private-access" href="access.html">Accesos de encargados</a>
+      </div>
+    </aside>
+
+    <section class="content-panel">
+      <header class="page-header">
+        <div>
+          <p class="section-kicker" id="sectionKicker">FORMULARIO GENERAL</p>
+          <h1 id="pageTitle">Elige una postulación</h1>
+        </div>
+        <button id="restartButton" class="ghost-button hidden" type="button">Cambiar formulario</button>
+      </header>
+
+      <div class="progress-wrap hidden" id="progressWrap">
+        <div class="progress-meta">
+          <span id="progressLabel">Sección 1</span>
+          <strong id="progressValue">0%</strong>
+        </div>
+        <div class="progress-track"><div id="progressBar" class="progress-bar"></div></div>
+      </div>
+
+      <section id="applicationContent" class="application-content"></section>
+
+      <footer id="formActions" class="form-actions hidden">
+        <button id="backButton" class="button secondary" type="button">Atrás</button>
+        <span id="formMessage" class="form-message"></span>
+        <button id="nextButton" class="button primary" type="button">Siguiente →</button>
+      </footer>
+    </section>
+  </main>
+
+  <audio id="backgroundMusic" src="assets/background_soft.webm" loop preload="auto"></audio>
+  <script src="config.js"></script>
+  <script src="questions.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
