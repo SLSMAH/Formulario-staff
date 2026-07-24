@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#08090d">
+  <title>Cruza2 Roleplay | Panel de evaluaciones</title>
+  <link rel="icon" href="assets/dragon_icon.png">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body class="dashboard-body">
+  <div class="background-grid"></div>
+
+  <main class="dashboard">
+    <header class="dashboard-header">
+      <div class="dashboard-brand">
+        <img src="assets/dragon_icon.png" alt="Cruza2">
+        <div><span class="eyebrow" id="panelRole">PANEL</span><h1 id="panelTitle">Evaluaciones</h1></div>
+      </div>
+      <div class="dashboard-actions">
+        <button id="refreshButton" class="ghost-button" type="button">Actualizar</button>
+        <button id="logoutButton" class="danger-button" type="button">Cerrar sesión</button>
+      </div>
+    </header>
+
+    <nav id="adminTabs" class="dashboard-tabs hidden">
+      <button class="tab-button active" data-tab="applications">Solicitudes</button>
+      <button class="tab-button" data-tab="activity">Actividad</button>
+      <button class="tab-button" data-tab="bindings">Control de IP</button>
+    </nav>
+
+    <section id="statsGrid" class="stats-grid"></section>
+
+    <section id="applicationsView">
+      <div class="dashboard-toolbar">
+        <input id="searchInput" type="search" placeholder="Buscar por Discord...">
+        <select id="categoryFilter">
+          <option value="all">Todas las categorías</option>
+          <option value="staff">Staff</option>
+          <option value="police">Policía</option>
+          <option value="mechanic">Mecánico</option>
+          <option value="ems">911 / EMS</option>
+        </select>
+        <select id="statusFilter">
+          <option value="all">Todos los estados</option>
+          <option value="Pendiente">Pendientes</option>
+          <option value="En revisión">En revisión</option>
+          <option value="Aceptado">Aceptados</option>
+          <option value="Rechazado">Rechazados</option>
+        </select>
+      </div>
+      <div id="applicationsList" class="applications-list"></div>
+    </section>
+
+    <section id="activityView" class="hidden">
+      <div id="activityList" class="activity-list"></div>
+    </section>
+
+    <section id="bindingsView" class="hidden">
+      <div class="security-notice">La primera entrada válida de cada jefe enlaza su cuenta a la IP pública utilizada. Solo un administrador puede restablecer ese enlace.</div>
+      <div id="bindingsList" class="bindings-grid"></div>
+    </section>
+  </main>
+
+  <dialog id="applicationDialog">
+    <article class="dialog-card">
+      <header class="dialog-header">
+        <div><span class="eyebrow" id="dialogCategory">SOLICITUD</span><h2 id="dialogTitle">Postulación</h2></div>
+        <button id="closeDialog" type="button">×</button>
+      </header>
+      <div id="dialogMeta" class="dialog-meta"></div>
+      <div id="dialogAnswers" class="dialog-answers"></div>
+      <footer class="review-box">
+        <label>Estado
+          <select id="reviewStatus">
+            <option>Pendiente</option><option>En revisión</option><option>Aceptado</option><option>Rechazado</option>
+          </select>
+        </label>
+        <label>Puntuación manual
+          <input id="reviewScore" type="number" min="0" max="100" placeholder="0 - 100">
+        </label>
+        <label class="notes-field">Notas privadas del evaluador
+          <textarea id="reviewNotes" maxlength="5000" placeholder="Observaciones, fortalezas, errores o razones de la decisión..."></textarea>
+        </label>
+        <button id="saveReview" class="button primary" type="button">Guardar evaluación</button>
+      </footer>
+    </article>
+  </dialog>
+
+  <script src="config.js"></script>
+  <script src="panel.js"></script>
+</body>
+</html>
